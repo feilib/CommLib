@@ -145,7 +145,22 @@ namespace CommLib.ShareFun
             ret = ret.TrimEnd(',');
             return Write(key, ret);
         }
-
+        /// <summary>
+        /// 写配置信息--bool 数组[注意，数组保存是逗号分隔的，所以string数组中的字符串不能有半角逗号]
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        protected bool Write(string key, bool[] value)
+        {
+            string ret = "";
+            foreach (bool i in value)
+            {
+                ret += i + ",";
+            }
+            ret = ret.TrimEnd(',');
+            return Write(key, ret);
+        }
         /// <summary>
         /// 读配置信息--字符串
         /// </summary>
@@ -257,7 +272,7 @@ namespace CommLib.ShareFun
         }
 
         /// <summary>
-        /// int数组类型，用逗号分隔
+        /// int数组类型，用逗号/分号分隔
         /// </summary>
         /// <param name="key"></param>
         /// <param name="noText"></param>
@@ -289,7 +304,7 @@ namespace CommLib.ShareFun
         }
 
         /// <summary>
-        /// 数组类型，用逗号分隔
+        /// 数组类型，用逗号/分号分隔
         /// </summary>
         /// <param name="key"></param>
         /// <param name="noText"></param>
@@ -321,7 +336,7 @@ namespace CommLib.ShareFun
         }
 
         /// <summary>
-        /// 数组类型，用逗号分隔
+        /// 数组类型，用逗号/分号分隔
         /// </summary>
         /// <param name="key"></param>
         /// <param name="noText"></param>
@@ -339,6 +354,37 @@ namespace CommLib.ShareFun
                 {
                     string[] vs = value.Split(',', ';');
                     return vs;
+                }
+                catch (Exception)
+                {
+                    return noText;
+                }
+            }
+        }
+        /// <summary>
+        /// 数组类型，用逗号分隔
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="noText"></param>
+        /// <returns></returns>
+        public bool[] Read(string key, bool[] noText)
+        {
+            string value = Read(key, "");
+            if (value == "")
+            {
+                return noText;
+            }
+            else
+           {
+                try
+                {
+                    string[] vs = value.Split(',', ';');
+                    bool[] ret = new bool[vs.Length];
+                    for (int i = 0; i < vs.Length; i++)
+                    {
+                        ret[i] = bool.Parse(vs[i]);
+                    }
+                    return ret;
                 }
                 catch (Exception)
                 {

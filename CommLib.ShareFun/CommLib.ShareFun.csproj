@@ -75,6 +75,8 @@
     <Compile Include="CodeTemplate.cs" />
     <Compile Include="ConfigBase.cs" />
     <Compile Include="ConfigFile.cs" />
+    <Compile Include="CRC16.cs" />
+    <Compile Include="CRC32.cs" />
     <Compile Include="Delegates.cs" />
     <Compile Include="Funs.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

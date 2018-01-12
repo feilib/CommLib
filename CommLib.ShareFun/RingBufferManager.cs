@@ -36,6 +36,11 @@ namespace CommLib.ShareFun
         public int DataEnd { get; set; }
 
         /// <summary>
+        /// 用于同步锁的内部变量，所有入库出库操作都要加锁。。
+        /// </summary>
+        private object lockObj;
+
+        /// <summary>
         /// 初始化，参数为缓冲区大小
         /// </summary>
         /// <param name="bufferSize">内部缓冲区大小</param>
@@ -43,6 +48,7 @@ namespace CommLib.ShareFun
         {
             DataCount = 0; DataStart = 0; DataEnd = 0;
             Buffer = new byte[bufferSize];
+            lockObj = new object();
         }
 
         /// <summary>
@@ -89,9 +95,13 @@ namespace CommLib.ShareFun
         /// </summary>
         public void Clear()
         {
-            DataCount = 0;
-            DataStart = 0;
-            DataEnd = 0;
+            lock (lockObj)
+            {
+                DataCount = 0;
+                DataStart = 0;
+                DataEnd = 0;
+            }
+
         }
 
 
@@ -101,23 +111,28 @@ namespace CommLib.ShareFun
         /// <param name="count">指定数量，如果超过现有数量，则全部清除</param>
         public void Clear(int count) // 
         {
-            if (count >= DataCount) // 如果需要清理的数据大于现有数据大小，则全部清理
+            lock (lockObj)
             {
-                DataCount = 0;
-                DataStart = 0;
-                DataEnd = 0;
-            }
-            else
-            {
-                if (DataStart + count >= Buffer.Length)
+
+
+                if (count >= DataCount) // 如果需要清理的数据大于现有数据大小，则全部清理
                 {
-                    DataStart = (DataStart + count) - Buffer.Length;
+                    DataCount = 0;
+                    DataStart = 0;
+                    DataEnd = 0;
                 }
                 else
                 {
-                    DataStart += count;
+                    if (DataStart + count >= Buffer.Length)
+                    {
+                        DataStart = (DataStart + count) - Buffer.Length;
+                    }
+                    else
+                    {
+                        DataStart += count;
+                    }
+                    DataCount -= count;
                 }
-                DataCount -= count;
             }
         }
 
@@ -130,38 +145,43 @@ namespace CommLib.ShareFun
         /// <exception cref="InternalBufferOverflowException">写数量超过容量时，抛异常</exception>
         public void WriteBuffer(byte[] buffer, int offset, int count)
         {
-            Int32 reserveCount = Buffer.Length - DataCount;
-            if (reserveCount >= count)                          // 可用空间够使用
+            lock (lockObj)
             {
-                if (DataEnd + count < Buffer.Length)            // 数据没到结尾
+
+
+                Int32 reserveCount = Buffer.Length - DataCount;
+                if (reserveCount >= count) // 可用空间够使用
                 {
-                    Array.Copy(buffer, offset, Buffer, DataEnd, count);
-                    DataEnd += count;
-                    DataCount += count;
-                }
-                else           //  数据结束索引超出结尾 循环到开始
-                {
-                    System.Diagnostics.Debug.WriteLine("缓存重新开始....");
-                    Int32 overflowIndexLength = (DataEnd + count) - Buffer.Length;      // 超出索引长度
-                    Int32 endPushIndexLength = count - overflowIndexLength;             // 填充在末尾的数据长度
-                    Array.Copy(buffer, offset, Buffer, DataEnd, endPushIndexLength);
-                    DataEnd = 0;
-                    offset += endPushIndexLength;
-                    DataCount += endPushIndexLength;
-                    if (overflowIndexLength != 0)
+                    if (DataEnd + count < Buffer.Length) // 数据没到结尾
                     {
-                        Array.Copy(buffer, offset, Buffer, DataEnd, overflowIndexLength);
+                        Array.Copy(buffer, offset, Buffer, DataEnd, count);
+                        DataEnd += count;
+                        DataCount += count;
                     }
-                    DataEnd += overflowIndexLength;                                     // 结束索引
-                    DataCount += overflowIndexLength;                                   // 缓存大小
+                    else //  数据结束索引超出结尾 循环到开始
+                    {
+                        //System.Diagnostics.Debug.WriteLine("缓存重新开始....");
+                        Int32 overflowIndexLength = (DataEnd + count) - Buffer.Length; // 超出索引长度
+                        Int32 endPushIndexLength = count - overflowIndexLength; // 填充在末尾的数据长度
+                        Array.Copy(buffer, offset, Buffer, DataEnd, endPushIndexLength);
+                        DataEnd = 0;
+                        offset += endPushIndexLength;
+                        DataCount += endPushIndexLength;
+                        if (overflowIndexLength != 0)
+                        {
+                            Array.Copy(buffer, offset, Buffer, DataEnd, overflowIndexLength);
+                        }
+                        DataEnd += overflowIndexLength; // 结束索引
+                        DataCount += overflowIndexLength; // 缓存大小
+                    }
                 }
-            }
-            else
-            {
-                string exp = string.Format("写入数量太多了，超缓冲区了\r\n待写入数据量：{0}\r\n总容量：{1}，已用：{2}，剩余：{3}",
-                                        count, Buffer.Length, GetDataCount(), GetReserveCount());
-                // 缓存溢出，抛异常
-                throw new InternalBufferOverflowException(exp);
+                else
+                {
+                    string exp = string.Format("写入数量太多了，超缓冲区了\r\n待写入数据量：{0}\r\n总容量：{1}，已用：{2}，剩余：{3}",
+                        count, Buffer.Length, GetDataCount(), GetReserveCount());
+                    // 缓存溢出，抛异常
+                    throw new InternalBufferOverflowException(exp);
+                }
             }
         }
 
@@ -174,27 +194,32 @@ namespace CommLib.ShareFun
         /// <exception cref="Exception">长度超过已知长度时，要抛异常。。</exception>
         public void ReadBuffer(byte[] targetBytes, Int32 offset, Int32 count)
         {
-            if (count > DataCount)
+            lock (lockObj)
             {
-                string exp = string.Format("读的太多，数据不够\r\n待读取数据量：{0}\r\n总容量：{1}，已用：{2}，剩余：{3}",
-                    count, Buffer.Length, GetDataCount(), GetReserveCount());
 
-                throw new Exception(exp);
-            }
-            Int32 tempDataStart = DataStart;
-            if (DataStart + count < Buffer.Length)
-            {
-                Array.Copy(Buffer, DataStart, targetBytes, offset, count);
-            }
-            else
-            {
-                Int32 overflowIndexLength = (DataStart + count) - Buffer.Length;    // 超出索引长度
-                Int32 endPushIndexLength = count - overflowIndexLength;             // 填充在末尾的数据长度
-                Array.Copy(Buffer, DataStart, targetBytes, offset, endPushIndexLength);
-                offset += endPushIndexLength;
-                if (overflowIndexLength != 0)
+
+                if (count > DataCount)
                 {
-                    Array.Copy(Buffer, 0, targetBytes, offset, overflowIndexLength);
+                    string exp = string.Format("读的太多，数据不够\r\n待读取数据量：{0}\r\n总容量：{1}，已用：{2}，剩余：{3}",
+                        count, Buffer.Length, GetDataCount(), GetReserveCount());
+
+                    throw new Exception(exp);
+                }
+                Int32 tempDataStart = DataStart;
+                if (DataStart + count < Buffer.Length)
+                {
+                    Array.Copy(Buffer, DataStart, targetBytes, offset, count);
+                }
+                else
+                {
+                    Int32 overflowIndexLength = (DataStart + count) - Buffer.Length; // 超出索引长度
+                    Int32 endPushIndexLength = count - overflowIndexLength; // 填充在末尾的数据长度
+                    Array.Copy(Buffer, DataStart, targetBytes, offset, endPushIndexLength);
+                    offset += endPushIndexLength;
+                    if (overflowIndexLength != 0)
+                    {
+                        Array.Copy(Buffer, 0, targetBytes, offset, overflowIndexLength);
+                    }
                 }
             }
         }

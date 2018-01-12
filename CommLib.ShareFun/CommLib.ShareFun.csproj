@@ -81,6 +81,7 @@
     <Compile Include="Funs.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Api.cs" />
+    <Compile Include="RingBufferManager.cs" />
     <Compile Include="UacHelper.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

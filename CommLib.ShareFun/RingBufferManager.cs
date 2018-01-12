@@ -1,33 +1,39 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
+using System.IO;
 
 namespace CommLib.ShareFun
 {
     /// <summary>
     /// 环形缓冲队列
+    /// <para>用法：</para>
+    /// <para>1. 使用构造函数，指定大小，创建缓冲区</para>
+    /// <para>2. 使用WriteBuffer，往队列里面写数据</para>
+    /// <para>3. 使用ReadBuffer，从队列里读数据，但是不删除已读出数据，可以重复多次读取</para>
+    /// <para>4. 使用PopBuffer，从队列里弹出数据，已弹出数据删除</para>
+    /// <para>5. 读取、弹出数据前，必须要检查队列内数据大小，超过数据会抛异常</para>
+    /// <para>用法：</para>
     /// </summary>
     public class RingBufferManager
     {
         /// <summary>
         /// 内部缓冲区
         /// </summary>
-        public byte[] Buffer { get; set; } 
+        public byte[] Buffer { get; set; }
 
         /// <summary>
         /// 现存数据量 -- 请勿修改
         /// </summary>
-        public int DataCount { get; set; } 
+        public int DataCount { get; set; }
 
         /// <summary>
         /// 起始索引 -- 请勿修改
         /// </summary>
-        public int DataStart { get; set; } 
+        public int DataStart { get; set; }
 
         /// <summary>
         /// 结束索引 -- 请勿修改
         /// </summary>
-        public int DataEnd { get; set; }   
+        public int DataEnd { get; set; }
 
         /// <summary>
         /// 初始化，参数为缓冲区大小
@@ -73,7 +79,7 @@ namespace CommLib.ShareFun
         /// 获得剩余的字节数
         /// </summary>
         /// <returns></returns>
-        public int GetReserveCount() 
+        public int GetReserveCount()
         {
             return Buffer.Length - DataCount;
         }
@@ -118,9 +124,10 @@ namespace CommLib.ShareFun
         /// <summary>
         /// 写入缓冲区
         /// </summary>
-        /// <param name="buffer"></param>
-        /// <param name="offset"></param>
-        /// <param name="count"></param>
+        /// <param name="buffer">写入的缓冲区</param>
+        /// <param name="offset">开始写入的位置</param>
+        /// <param name="count">写入数量</param>
+        /// <exception cref="InternalBufferOverflowException">写数量超过容量时，抛异常</exception>
         public void WriteBuffer(byte[] buffer, int offset, int count)
         {
             Int32 reserveCount = Buffer.Length - DataCount;
@@ -151,7 +158,10 @@ namespace CommLib.ShareFun
             }
             else
             {
-                // 缓存溢出，不处理
+                string exp = string.Format("写入数量太多了，超缓冲区了\r\n待写入数据量：{0}\r\n总容量：{1}，已用：{2}，剩余：{3}",
+                                        count, Buffer.Length, GetDataCount(), GetReserveCount());
+                // 缓存溢出，抛异常
+                throw new InternalBufferOverflowException(exp);
             }
         }
 
@@ -161,9 +171,16 @@ namespace CommLib.ShareFun
         /// <param name="targetBytes">要存入的byte数组</param>
         /// <param name="offset">该byte数组的大小</param>
         /// <param name="count">数量</param>
+        /// <exception cref="Exception">长度超过已知长度时，要抛异常。。</exception>
         public void ReadBuffer(byte[] targetBytes, Int32 offset, Int32 count)
         {
-            if (count > DataCount) throw new Exception("环形缓冲区异常，读取长度大于数据长度");
+            if (count > DataCount)
+            {
+                string exp = string.Format("读的太多，数据不够\r\n待读取数据量：{0}\r\n总容量：{1}，已用：{2}，剩余：{3}",
+                    count, Buffer.Length, GetDataCount(), GetReserveCount());
+
+                throw new Exception(exp);
+            }
             Int32 tempDataStart = DataStart;
             if (DataStart + count < Buffer.Length)
             {
@@ -188,9 +205,10 @@ namespace CommLib.ShareFun
         /// <param name="targetBytes">要存入的byte数组</param>
         /// <param name="offset">该byte数组的大小</param>
         /// <param name="count">数量</param>
+        /// <exception cref="Exception">长度超过已知长度时，要抛异常。。</exception>
         public void PopBuffer(byte[] targetBytes, Int32 offset, Int32 count)
         {
-            ReadBuffer(targetBytes,offset,count);
+            ReadBuffer(targetBytes, offset, count);
             Clear(count);
         }
 

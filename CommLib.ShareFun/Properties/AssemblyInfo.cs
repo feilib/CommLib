@@ -47,7 +47,8 @@ using System.Runtime.InteropServices;
 * 2017年11月21日 V1.1.0.3
 * 1. 增加了CRC32和CRC16的计算算法，还待验证
 * 
-* 2018年1月12日 V1.1.1.0
+* 2018年1月12日 V1.1.1.1
 * 1. 增加了循环队列的处理逻辑RingBufferManager，便于modbus、tcp等地方调用。
+* 2. 对RingBufferManager增加了一些注释
 ------------------------*/
 

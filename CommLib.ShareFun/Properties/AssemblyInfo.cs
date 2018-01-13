@@ -32,8 +32,8 @@ using System.Runtime.InteropServices;
 // 可以指定所有这些值，也可以使用“内部版本号”和“修订号”的默认值，
 // 方法是按如下所示使用“*”:
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("1.1.1.2")]
-[assembly: AssemblyFileVersion("1.1.1.2")]
+[assembly: AssemblyVersion("1.1.2.0")]
+[assembly: AssemblyFileVersion("1.1.2.0")]
 
 /*----------------------
 * 更新历史：
@@ -54,5 +54,8 @@ using System.Runtime.InteropServices;
 * 2018年1月12日 V1.1.1.2
 * 1. 增加了循环队列的单元测试，主要测试性能和锁。
 * 2. 测出来问题，发现不加锁容易跑飞，现已经在循环队列中加锁。。。
+* 
+* 2018年1月13日 V1.1.2.0
+* 1. 增加了异步TCP服务端代码，还未测试。。
 ------------------------*/
 

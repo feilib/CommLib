@@ -72,6 +72,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AsyncSocketServer.cs" />
     <Compile Include="CodeTemplate.cs" />
     <Compile Include="ConfigBase.cs" />
     <Compile Include="ConfigFile.cs" />

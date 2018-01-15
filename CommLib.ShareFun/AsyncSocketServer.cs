@@ -31,13 +31,13 @@ namespace CommLib.ShareFun
         /// <summary>
         /// 客户端连接回调-如果一个新客户端连接上来，将通过此回调通知上层应用
         /// </summary>
-        private ReceiveTcpClientHandler ClientArrived;
+        private ReceiveTcpHandler ClientArrived;
 
         /// <summary>
         /// 客户端删除回调--某个客户端去掉了，通过此回调通知上层应用
         /// <para>一般是上层主动删掉的话，就不用监控这个了。。</para>
         /// </summary>
-        private ReceiveTcpClientHandler ClientDeleted;
+        private ReceiveTcpHandler ClientDeleted;
 
         /// <summary>
         /// 客户端列表
@@ -62,13 +62,15 @@ namespace CommLib.ShareFun
         /// <param name="clientEvnet">客户端已经连上回调，所有客户端连接时会触发此回调</param>
         /// <param name="log">日志回调，对象中所有日志将通过此回调输出，不写的话就不输出日志了（客户端也用这个回调回显日志）</param>
         public AsyncSocketServer(string ip, int port,
-            ReceiveTcpClientHandler clientAdd = null,
-            ReceiveTcpClientHandler clientDel = null,
+            ReceiveTcpHandler clientAdd = null,
+            ReceiveTcpHandler clientDel = null,
             MyDelegateString log = null)
         {
-            ClientArrived += clientAdd;
-            ClientDeleted += clientDel;
-            makeLog += log;
+
+            if (clientAdd != null) ClientArrived += clientAdd;
+            if (clientDel != null) ClientDeleted += clientDel;
+            if (log != null) makeLog += log;
+
 
             StartListening(ip, port);
         }
@@ -85,9 +87,9 @@ namespace CommLib.ShareFun
         /// 设置客户端接入回调
         /// </summary>
         /// <param name="arrive"></param>
-        public void SetClientArrivedCallBack(ReceiveTcpClientHandler arrive)
+        public void SetClientArrivedCallBack(ReceiveTcpHandler arrive)
         {
-            ClientArrived += arrive;
+            if (arrive != null) ClientArrived += arrive;
         }
 
         /// <summary>
@@ -96,15 +98,16 @@ namespace CommLib.ShareFun
         /// <param name="log"></param>
         public void SetLogCallBack(MyDelegateString log)
         {
-            makeLog += log;
+            if (log != null) makeLog += log;
         }
+
         /// <summary>
         /// 设置客户端掉线回调
         /// </summary>
         /// <param name="del"></param>
-        public void SetClientDeletedCallBack(ReceiveTcpClientHandler del)
+        public void SetClientDeletedCallBack(ReceiveTcpHandler del)
         {
-            ClientDeleted += del;
+            if (del != null) ClientDeleted += del;
         }
 
         /// <summary>
@@ -120,12 +123,22 @@ namespace CommLib.ShareFun
             IPEndPoint ep = new IPEndPoint(IPAddress.Parse(ip), port);
             StartListening(ep);
         }
-
         /// <summary>
         /// 使用IPEndPoint启动服务
         /// </summary>
         /// <param name="ep">服务端IPEndPoint对象</param>
-        public void StartListening(IPEndPoint ep)
+        private void StartListening(IPEndPoint ep)
+        {
+            Thread th = new Thread(StartServer);
+            th.IsBackground = true;
+            th.Start(ep);
+        }
+
+        /// <summary>
+        /// 私有启动，开个线程启动。。
+        /// </summary>
+        /// <param name="ep"></param>
+        private void StartServer(object epo)
         {
             #region 抄来代码中的自动获取IP地址的代码，这个先去掉了，后期如果需要自动获取IP，就找这个。。
             //// Establish the local endpoint for the socket.  
@@ -136,7 +149,9 @@ namespace CommLib.ShareFun
             //IPEndPoint localEndPoint = new IPEndPoint(ipAddress, 11000);
             #endregion
 
-            makeLog($"start listening...IP:[{ep.Address.ToString()}],port[{ep.Port}]");
+            IPEndPoint ep = (IPEndPoint)epo;
+
+            makeLog?.Invoke($"start listening...IP:[{ep.Address.ToString()}],port[{ep.Port}]");
 
             try
             {
@@ -154,7 +169,7 @@ namespace CommLib.ShareFun
                     allDone.Reset();
 
                     // Start an asynchronous socket to listen for connections.  
-                    makeLog("Waiting for a connection...");
+                    makeLog?.Invoke("Waiting for a connection...");
                     listener.BeginAccept(
                         new AsyncCallback(AcceptCallback),
                         listener);
@@ -166,10 +181,10 @@ namespace CommLib.ShareFun
             }
             catch (Exception e)
             {
-                Console.WriteLine(e.ToString());
+                makeLog?.Invoke(e.ToString());
             }
 
-            makeLog("stop listening...");
+            makeLog?.Invoke("stop listening...");
 
         }
 
@@ -187,14 +202,14 @@ namespace CommLib.ShareFun
             Socket handler = listener.EndAccept(ar);
 
             // Create the state object.  
-            ClientObject state = new ClientObject(this, makeLog);
-            state.workSocket = handler;
+            ClientObject state = new ClientObject(this, handler, makeLog);
 
             //把这个链接对象塞入到队列中。。
             ClientList.Add(state);
             //通知上层，客户端已经收到
-            ClientArrived(state);
-            makeLog("Accept client:" + state.remoteInfo);
+
+            ClientArrived?.Invoke(state);
+            makeLog?.Invoke("Accept client:" + state.remoteInfo);
         }
 
         /// <summary>
@@ -209,7 +224,7 @@ namespace CommLib.ShareFun
                 {
                     ClientList.Remove(s);
                     //然后通知一下上层应用，，避免他处理抛异常，导致服务器删不掉客户端了。。
-                    ClientDeleted(s);
+                    ClientDeleted?.Invoke(s);
                 }
             }
             catch (Exception e)
@@ -231,6 +246,7 @@ namespace CommLib.ShareFun
     /// <para>2. 查询方式</para>
     /// <para>2.1 上位程序没有调用SetReceiveCallBack()为此对象的ReceiveMessage赋值，不知道是否已经有数据过来</para>
     /// <para>2.2 上位程序使用定时器周期查询ReceivedData是否有数</para>
+    /// <para>3. 说明一下，这个客户端无法检测网络断开（太复杂了），所以服务端检测心跳，长期没有心跳就主动断开好了。。</para>
     /// </summary>
     public class ClientObject
     {
@@ -309,8 +325,9 @@ namespace CommLib.ShareFun
         /// <summary>
         /// 收到信息回调，只要收到一次报文，就会触发此回调，本对象创建后，需要上层应用手动对此赋值，
         /// 若不赋值则需要通过查询的方式判断是否有数据到来。
+        /// 要把自己传出去，否则不知道是哪个连接发来的消息。。 
         /// </summary>
-        private MyDelegateVoid ReceiveMessage;
+        private ReceiveTcpHandler ReceiveMessage;
 
 
         /// <summary>
@@ -318,9 +335,10 @@ namespace CommLib.ShareFun
         /// </summary>
         /// <param name="server">所隶属的服务对象</param>
         /// <param name="log">日志代理</param>
-        public ClientObject(AsyncSocketServer server, MyDelegateString log)
+        public ClientObject(AsyncSocketServer server, Socket sk, MyDelegateString log)
         {
             Parent = server;
+            workSocket = sk;
             makeLog = log;
             lock (lockObj)
             {
@@ -332,14 +350,14 @@ namespace CommLib.ShareFun
             workSocket.BeginReceive(buffer, 0, ClientObject.BufferSize, 0,
                 new AsyncCallback(ReadCallback), workSocket);
 
-            makeLog(remoteInfo + " 已接入，已启动监听...")
+            makeLog(remoteInfo + " 已接入，已启动监听...");
         }
 
         /// <summary>
         /// 设置接受消息的回调
         /// </summary>
         /// <param name="cb"></param>
-        public void SetReceiveCallBack(MyDelegateVoid cb)
+        public void SetReceiveCallBack(ReceiveTcpHandler cb)
         {
             ReceiveMessage = cb;
         }
@@ -362,17 +380,18 @@ namespace CommLib.ShareFun
                     ReceivedData.WriteBuffer(buffer, 0, bytesRead);
 
                     //通知上层，说已经收到了数据。。。然后让他自己查询吧。。
-                    ReceiveMessage();
+                    ReceiveMessage?.Invoke(this);
 
                     // 然后继续接收不用停
                     workSocket.BeginReceive(buffer, 0, ClientObject.BufferSize, 0,
                          new AsyncCallback(ReadCallback), workSocket);
 
                 }
+
             }
             catch (Exception e)
             {
-                makeLog(e);
+                makeLog(e.ToString());
             }
         }
 
@@ -443,6 +462,6 @@ namespace CommLib.ShareFun
     /// <summary>
     /// TCP服务器接收到连接的处理回调对象
     /// </summary>
-    public delegate void ReceiveTcpClientHandler(ClientObject co);
+    public delegate void ReceiveTcpHandler(ClientObject co);
 
 }

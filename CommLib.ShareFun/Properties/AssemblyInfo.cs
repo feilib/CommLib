@@ -32,8 +32,8 @@ using System.Runtime.InteropServices;
 // 可以指定所有这些值，也可以使用“内部版本号”和“修订号”的默认值，
 // 方法是按如下所示使用“*”:
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("1.1.2.0")]
-[assembly: AssemblyFileVersion("1.1.2.0")]
+[assembly: AssemblyVersion("1.1.2.1")]
+[assembly: AssemblyFileVersion("1.1.2.1")]
 
 /*----------------------
 * 更新历史：
@@ -57,5 +57,10 @@ using System.Runtime.InteropServices;
 * 
 * 2018年1月13日 V1.1.2.0
 * 1. 增加了异步TCP服务端代码，还未测试。。
+* 
+* 2018年1月15日 V1.1.2.1
+* 1. 修正了TCP服务器，委托为空时调用异常的bug。
+* 2. tcp收到报文上报的委托也要回传本身的socket object，方便上层调用
+* 3. 增加了tcp服务器的单元测试，基本可用。。
 ------------------------*/
 
